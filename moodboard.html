@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>心情小畫板</title>
+
+<style>
+/* ==== 全域 Reset ==== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ==== 🎨 設計 Token — 想改顏色在這裡改 ==== */
+:root {
+  --purple:       #7C6FF7;   /* 主色 按鈕/強調 */
+  --purple-light: #EEF0FF;   /* 淡紫 badge背景 */
+  --purple-dark:  #5048D4;   /* 深紫 hover狀態 */
+  --bg:    #F7F6FF;          /* 頁面背景 */
+  --card:  #fff;             /* 卡片背景 */
+  --border: rgba(0,0,0,0.1); /* 邊框顏色 */
+  --text:      #1a1a2e;       /* 主要文字 */
+  --text-sub:  #6b6b8d;       /* 次要文字（說明、標籤） */
+  --red:   #E24B4A;          /* 刪除/錯誤 */
+  --radius: 12px;             /* 圓角大小 */
+  --shadow: 0 2px 12px rgba(124,111,247,0.10); /* 卡片陰影 */
+}
+
+/* ==== Body ==== */
+body {
+  font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ============================================================
+   Header（頂部導覽列）
+   ============================================================ */
+header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+  display: flex; align-items: center;
+  height: 52px; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+}
+header .logo {
+  font-size: 18px; font-weight: 700;
+  color: var(--purple); flex: 1;
+}
+header .logo span {
+  font-size: 13px; color: var(--text-sub);
+  font-weight: 400; margin-left: 6px;
+}
+.tab-pills {
+  display: flex; background: var(--bg);
+  border-radius: 8px; padding: 3px; gap: 3px;
+}
+.tab-pill {
+  padding: 5px 14px; border-radius: 6px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; border: none;
+  background: none; color: var(--text-sub);
+  transition: all 0.15s;
+}
+.tab-pill.active {
+  background: #fff; color: var(--purple);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* ============================================================
+   主內容區
+   ============================================================ */
+main { max-width: 900px; margin: 0 auto; padding: 1rem; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ============================================================
+   共用元件：按鈕、表單欄位
+   ============================================================ */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  font-size: 11px; color: var(--text-sub);
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.field input[type=text],
+.field input[type=date] {
+  height: 38px; border: 1px solid var(--border);
+  border-radius: 8px; padding: 0 12px;
+  font-size: 14px; color: var(--text);
+  background: #fff; transition: border-color 0.15s;
+}
+.field input:focus { outline: none; border-color: var(--purple); }
+.field input[type=color] {
+  width: 48px; height: 38px;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 3px; cursor: pointer; background: #fff;
+}
+/* 通用按鈕 */
+.btn {
+  height: 38px; padding: 0 16px;
+  border-radius: 8px; border: 1px solid var(--border);
+  cursor: pointer; font-size: 14px; font-weight: 500;
+  background: #fff; color: var(--text);
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all 0.15s;
+}
+.btn:hover    { background: var(--bg); }
+.btn.primary  { background: var(--purple); color: #fff; border-color: var(--purple); }
+.btn.primary:hover { background: var(--purple-dark); }
+.btn.sm       { height: 30px; padding: 0 10px; font-size: 12px; }
+.btn.danger   { color: var(--red); border-color: var(--red); }
+.btn.danger:hover { background: #fff0f0; }
+
+/* ============================================================
+   管理活動分頁
+   ============================================================ */
+.admin-add {
+  background: var(--card); border-radius: var(--radius);
+  padding: 1.25rem; margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+}
+.admin-add h3 {
+  font-size: 14px; font-weight: 600;
+  margin-bottom: 12px; color: var(--text-sub);
+}
+.add-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+
+.event-cards { display: flex; flex-direction: column; gap: 8px; }
+.event-card-admin {
+  background: var(--card); border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow); border: 1px solid var(--border);
+}
+.ev-dot   { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.ev-meta  { flex: 1; }
+.ev-name  { font-size: 15px; font-weight: 600; }
+.ev-date  { font-size: 12px; color: var(--text-sub); }
+.ev-count {
+  font-size: 12px; font-weight: 500;
+  background: var(--purple-light); color: var(--purple-dark);
+  padding: 3px 9px; border-radius: 99px;
+}
+.empty-state {
+  text-align: center; padding: 3rem;
+  color: var(--text-sub); font-size: 14px;
+}
+
+/* ============================================================
+   畫畫留言分頁 — 頂部活動選擇
+   ============================================================ */
+.client-top {
+  background: var(--card); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  box-shadow: var(--shadow);
+}
+.client-top select {
+  flex: 1; min-width: 180px; height: 40px;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 0 12px; font-size: 14px;
+  color: var(--text); background: #fff;
+}
+.client-top select:focus { outline: none; border-color: var(--purple); }
+.ev-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--purple-light); color: var(--purple-dark);
+  padding: 5px 12px; border-radius: 99px;
+  font-size: 13px; font-weight: 600;
+}
+
+/* ============================================================
+   畫板區塊
+   ============================================================ */
+.canvas-section {
+  background: var(--card); border-radius: var(--radius);
+  padding: 1rem; margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+  display: none;
+}
+
+/* 工具列 */
+.toolbar {
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.tool-group { display: flex; gap: 4px; align-items: center; }
+.sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+
+/* 每個工具按鈕 */
+.tool-btn {
+  width: 34px; height: 34px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all 0.15s;
+  color: var(--text); position: relative;
+}
+.tool-btn:hover { background: var(--purple-light); border-color: var(--purple); }
+.tool-btn.active { background: var(--purple); color: #fff; border-color: var(--purple); }
+.tool-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute; top: 100%; left: 50%;
+  transform: translateX(-50%); margin-top: 5px;
+  background: #1a1a2e; color: #fff;
+  padding: 3px 8px; border-radius: 5px;
+  font-size: 11px; white-space: nowrap;
+  z-index: 10; pointer-events: none;
+}
+
+/* 顏色色票 */
+.color-swatches { display: flex; gap: 4px; flex-wrap: wrap; }
+.swatch {
+  width: 26px; height: 26px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: all 0.12s; flex-shrink: 0;
+}
+.swatch.active { border-color: var(--text); transform: scale(1.15); }
+
+/* 大小 / 透明度滑桿 */
+.size-wrap { display: flex; align-items: center; gap: 6px; }
+.size-wrap input[type=range] { width: 70px; }
+.size-wrap span { font-size: 12px; color: var(--text-sub); min-width: 20px; }
+
+/* 畫布本體 */
+#drawCanvas {
+  display: block; width: 100%;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: #fff; cursor: crosshair;
+  touch-action: none; 
+}
+.canvas-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+/* ============================================================
+   留言輸入區
+   ============================================================ */
+.mood-section {
+  background: var(--card); border-radius: var(--radius);
+  padding: 1rem 1.25rem; margin-bottom: 1rem;
+  box-shadow: var(--shadow);
+  display: none; 
+}
+.mood-section h3 {
+  font-size: 13px; font-weight: 600; color: var(--text-sub);
+  margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.mood-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.mood-row input {
+  flex: 1; min-width: 150px; height: 40px;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 0 12px; font-size: 14px; color: var(--text);
+}
+.mood-row input:focus { outline: none; border-color: var(--purple); }
+
+/* ============================================================
+   留言畫廊
+   ============================================================ */
+.gallery-grid {
+  position: relative;
+  width: 100%;
+  height: 550px; /* 大畫布的高度，可自由調整 */
+  background: #fdfdfd;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  overflow: hidden; /* 讓跑出去的畫作不會撐破版面 */
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 20px 20px; /* 加上可愛的點陣背景 */
+}
+
+/* 每一張散落的貼紙 */
+.board-item {
+  position: absolute;
+  width: 180px; /* 貼紙基礎大小 */
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.board-item:hover {
+  z-index: 9999 !important; /* 滑鼠移過去時跑到最上層 */
+  transform: scale(1.3) !important; /* 放大 */
+}
+
+/* 畫作本身 */
+.board-item img {
+  width: 100%;
+  display: block;
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.15)); /* 貼紙陰影 */
+}
+
+/* 姓名小標籤 */
+.board-tag {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: var(--purple);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+/* 隱藏的心情留言氣泡 (Hover時才顯示) */
+.board-mood {
+  display: none;
+  position: absolute;
+  bottom: 120%; /* 顯示在標籤上方 */
+  right: 0;
+  background: #1a1a2e;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  pointer-events: none;
+}
+
+/* 氣泡的小三角形 */
+.board-mood::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  right: 15px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: #1a1a2e transparent transparent transparent;
+}
+
+.board-item:hover .board-mood {
+  display: block;
+}
+
+/* ============================================================
+   通知提示（Toast）
+   ============================================================ */
+#toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1a1a2e; color: #fff;
+  padding: 10px 20px; border-radius: 10px;
+  font-size: 14px; font-weight: 500;
+  opacity: 0; transition: all 0.25s;
+  pointer-events: none; z-index: 9000;
+  white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.loading {
+  text-align: center; padding: 2rem;
+  color: var(--text-sub); font-size: 14px;
+}
+.loading::after {
+  content: '';
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid var(--purple); border-top-color: transparent;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  margin-left: 8px; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   手機版響應式
+   ============================================================ */
+@media (max-width: 500px) {
+  .add-row { flex-direction: column; }
+  .field { width: 100%; }
+  .field input[type=text],
+  .field input[type=date] { width: 100%; }
+  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎨 心情小畫板 <span id="headerEventLabel"></span></div>
+  <div class="tab-pills">
+    <button class="tab-pill active" onclick="switchTab('client', this)">畫畫留言</button>
+    <button class="tab-pill"        onclick="switchTab('admin',  this)">管理活動 🔒</button>
+  </div>
+</header>
+
+<main>
+  <div class="panel active" id="panel-client">
+    <div class="client-top">
+      <span style="font-size:18px">📅</span>
+      <select id="eventSelect" onchange="onEventChange()">
+        <option value="">— 選擇今天的活動 —</option>
+      </select>
+      <span class="ev-badge" id="evBadge" style="display:none"></span>
+    </div>
+
+    <div class="canvas-section" id="canvasSection">
+      <div class="toolbar">
+        <div class="color-swatches" id="swatches"></div>
+        <div class="sep"></div>
+
+        <div class="tool-group">
+          <button class="tool-btn active" id="tb-pen"    onclick="setTool('pen')"    title="畫筆">✏️</button>
+          <button class="tool-btn"        id="tb-line"   onclick="setTool('line')"   title="直線">╱</button>
+          <button class="tool-btn"        id="tb-rect"   onclick="setTool('rect')"   title="矩形">▭</button>
+          <button class="tool-btn"        id="tb-circle" onclick="setTool('circle')" title="圓形">○</button>
+          <button class="tool-btn"        id="tb-fill"   onclick="setTool('fill')"   title="填色">🪣</button>
+          <button class="tool-btn"        id="tb-text"   onclick="setTool('text')"   title="文字（雙擊畫板輸入）">T</button>
+          <button class="tool-btn"        id="tb-star"   onclick="setTool('star')"   title="星星">★</button>
+          <button class="tool-btn"        id="tb-eraser" onclick="setTool('eraser')" title="橡皮擦">🧹</button>
+        </div>
+        <div class="sep"></div>
+
+        <div class="size-wrap">
+          <span style="font-size:11px;color:var(--text-sub)">大小</span>
+          <input type="range" id="sizeSlider" min="1" max="60" value="8"
+                 oninput="onSizeChange(this.value)">
+          <span id="sizeLabel">8</span>
+        </div>
+        <div class="sep"></div>
+
+        <div class="size-wrap">
+          <span style="font-size:11px;color:var(--text-sub)">透明</span>
+          <input type="range" id="opacitySlider" min="10" max="100" value="100"
+                 oninput="onOpacityChange(this.value)">
+          <span id="opacityLabel">100%</span>
+        </div>
+      </div>
+
+      <canvas id="drawCanvas" height="320"></canvas>
+
+      <div class="canvas-actions">
+        <button class="btn sm" onclick="undo()">↩ 復原</button>
+        <button class="btn sm" onclick="clearCanvas()">🗑 清除</button>
+        <button class="btn sm" onclick="saveLocal()">⬇ 下載畫作</button>
+      </div>
+    </div>
+
+    <div class="mood-section" id="moodSection">
+      <h3>留言</h3>
+      <div class="mood-row">
+        <input type="text" id="authorName"
+               placeholder="你的名字（可留空）"
+               maxlength="20"
+               style="max-width:160px">
+        <input type="text" id="moodText"
+               placeholder="今天的心情或想說的話..."
+               maxlength="100">
+        <button class="btn primary" onclick="submitEntry()">送出 ✓</button>
+      </div>
+    </div>
+
+    <div class="gallery-section" id="gallerySection">
+      <div class="gallery-header">
+        <span style="font-size:18px">🖼</span>
+        <h3>大家的留言</h3>
+        <span class="count" id="galleryCount"></span>
+        <button class="btn sm" onclick="loadGallery()" style="margin-left:auto">重新整理</button>
+      </div>
+      <div class="gallery-grid" id="galleryGrid">
+        <div class="loading">載入中</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-admin">
+    <div class="admin-add">
+      <h3>新增活動</h3>
+      <div class="add-row">
+        <div class="field" style="flex:2;min-width:140px">
+          <label>活動名稱</label>
+          <input type="text" id="newName"
+                 placeholder="例：畢業旅行、生日派對..."
+                 maxlength="30">
+        </div>
+        <div class="field">
+          <label>日期</label>
+          <input type="date" id="newDate">
+        </div>
+        <div class="field">
+          <label>顏色</label>
+          <input type="color" id="newColor" value="#7C6FF7">
+        </div>
+        <button class="btn primary" onclick="addEvent()" style="margin-top:auto">
+          ＋ 新增
+        </button>
+      </div>
+    </div>
+
+    <div class="event-cards" id="adminList">
+      <div class="empty-state">還沒有活動，先新增一個吧！</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, push, onValue, remove, get }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ============================================================
+// 🔧 1. Firebase 專案設定 (請在這裡填入你的資料)
+// ============================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyBAHHzJ_EyxGwMKEpK6UhJN14xVX1O6iSs",
+  authDomain: "sk-diary-6e5bd.firebaseapp.com",
+  databaseURL: "https://sk-diary-6e5bd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sk-diary-6e5bd",
+  storageBucket: "sk-diary-6e5bd.firebasestorage.app",
+  messagingSenderId: "543213336722",
+  appId: "1:543213336722:web:f112effc184352a7890e4b",
+  measurementId: "G-WQ721MRHGT"
+};
+
+// ============================================================
+// 🔐 2. 管理員密碼設定 (想要改密碼請改這裡)
+// ============================================================
+const ADMIN_PASSWORD = "sk123";
+
+
+const COLORS = [
+  '#1a1a2e', '#ffffff', '#E24B4A', '#EF9F27', '#F9D423', '#639922',
+  '#1D9E75', '#378ADD', '#7C6FF7', '#D4537E', '#FF9A76', '#A78BFA',
+  '#34D399', '#60A5FA',
+];
+
+const state = {
+  db: null,
+  tool: 'pen', color: '#1a1a2e', size: 8, opacity: 1,
+  drawing: false, startX: 0, startY: 0, lastX: 0, lastY: 0,
+  snapshot: null, history: [],
+  selectedEvent: null, events: {},
+  isAdmin: false // 記錄是否已經驗證過密碼
+};
+
+// ============================================================
+//   初始化 Firebase (網頁載入自動執行)
+// ============================================================
+
+
+function init() {
+  buildSwatches();
+  initCanvas();
+  loadEvents();
+  document.getElementById('newDate').value = new Date().toISOString().split('T')[0];
+}
+
+/* ============================================================
+   分頁切換 (含密碼驗證邏輯)
+   ============================================================ */
+window.switchTab = function (tab, btn) {
+  // 如果點擊的是管理分頁，且尚未驗證過
+  if (tab === 'admin') {
+    if (!state.isAdmin) {
+      const pwd = prompt('🔒 這是管理員專區，請輸入密碼：');
+      if (pwd !== ADMIN_PASSWORD) {
+        if (pwd !== null) alert('密碼錯誤！'); // 如果按取消就不彈錯
+        return; // 密碼錯了就中斷，不會切換分頁
+      }
+      state.isAdmin = true; // 驗證成功，記錄狀態
+      showToast('歡迎回來，管理員！');
+    }
+  }
+
+  document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  btn.classList.add('active');
+  
+  if (tab === 'admin') renderAdminList();
+};
+
+/* ============================================================
+   從 Firebase 監聽活動（即時更新）
+   ============================================================ */
+function loadEvents() {
+  onValue(ref(state.db, 'events'), snap => {
+    state.events = snap.val() || {};
+    renderEventSelect();
+    if (state.isAdmin && document.getElementById('panel-admin').classList.contains('active')) {
+      renderAdminList();
+    }
+  });
+}
+
+function renderEventSelect() {
+  const sel = document.getElementById('eventSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— 選擇今天的活動 —</option>';
+  Object.entries(state.events)
+    .sort((a, b) => b[1].date.localeCompare(a[1].date))
+    .forEach(([id, ev]) => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = `${ev.name}（${ev.date}）`;
+      sel.appendChild(opt);
+    });
+  if (cur && state.events[cur]) { sel.value = cur; onEventChange(); }
+}
+
+window.onEventChange = function () {
+  const id = document.getElementById('eventSelect').value;
+  state.selectedEvent = id || null;
+  const ev = id && state.events[id];
+
+  document.getElementById('evBadge').style.display = ev ? 'inline-flex' : 'none';
+  if (ev) {
+    document.getElementById('evBadge').innerHTML =
+      `<span style="width:8px;height:8px;border-radius:50%;background:${ev.color}"></span> ${ev.name}`;
+    document.getElementById('headerEventLabel').textContent = '· ' + ev.name;
+  } else {
+    document.getElementById('headerEventLabel').textContent = '';
+  }
+
+  document.getElementById('canvasSection').style.display  = ev ? 'block' : 'none';
+  document.getElementById('moodSection').style.display    = ev ? 'block' : 'none';
+  document.getElementById('gallerySection').style.display = ev ? 'block' : 'none';
+
+  if (ev) loadGallery();
+};
+
+/* ============================================================
+   管理活動：新增 / 刪除
+   ============================================================ */
+window.addEvent = function () {
+  const name  = document.getElementById('newName').value.trim();
+  const date  = document.getElementById('newDate').value;
+  const color = document.getElementById('newColor').value;
+  if (!name || !date) { showToast('請填入名稱與日期'); return; }
+  push(ref(state.db, 'events'), { name, date, color });
+  document.getElementById('newName').value = '';
+  showToast('活動已新增 ✓');
+};
+
+window.deleteEvent = async function (id) {
+  if (!confirm('確定要刪除此活動？相關留言也會一起刪除。')) return;
+  await remove(ref(state.db, 'events/'  + id));
+  await remove(ref(state.db, 'entries/' + id));
+  if (state.selectedEvent === id) {
+    state.selectedEvent = null;
+    document.getElementById('eventSelect').value = '';
+    onEventChange();
+  }
+  showToast('已刪除');
+};
+
+function renderAdminList() {
+  const el = document.getElementById('adminList');
+  if (!Object.keys(state.events).length) {
+    el.innerHTML = '<div class="empty-state">還沒有活動，先新增一個吧！</div>';
+    return;
+  }
+  el.innerHTML = '';
+  Object.entries(state.events)
+    .sort((a, b) => b[1].date.localeCompare(a[1].date))
+    .forEach(([id, ev]) => {
+      const card = document.createElement('div');
+      card.className = 'event-card-admin';
+      card.innerHTML = `
+        <div class="ev-dot" style="background:${ev.color}"></div>
+        <div class="ev-meta">
+          <div class="ev-name">${ev.name}</div>
+          <div class="ev-date">${ev.date}</div>
+        </div>
+        <span class="ev-count" id="count-${id}">… 則</span>
+        <button class="btn sm danger" onclick="deleteEvent('${id}')">刪除</button>
+      `;
+      el.appendChild(card);
+      get(ref(state.db, 'entries/' + id)).then(snap => {
+        const c = snap.exists() ? Object.keys(snap.val()).length : 0;
+        const badge = document.getElementById('count-' + id);
+        if (badge) badge.textContent = c + ' 則';
+      });
+    });
+}
+
+/* ============================================================
+   送出留言
+   ============================================================ */
+window.submitEntry = function () {
+  if (!state.selectedEvent) return;
+  const canvas = document.getElementById('drawCanvas');
+
+  const tmp = document.createElement('canvas');
+  tmp.width  = 400;
+  tmp.height = Math.round(400 * canvas.height / canvas.width);
+  tmp.getContext('2d').drawImage(canvas, 0, 0, tmp.width, tmp.height);
+  const image = tmp.toDataURL('image/png');
+
+  const mood   = document.getElementById('moodText').value.trim();
+  const author = document.getElementById('authorName').value.trim() || '匿名';
+  const time   = new Date().toLocaleString('zh-TW', {
+    month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  push(ref(state.db, 'entries/' + state.selectedEvent), { image, mood, author, time });
+  clearCanvas();
+  document.getElementById('moodText').value = '';
+  showToast('送出成功！🎉');
+  loadGallery();
+};
+
+/* ============================================================
+   載入畫廊
+   ============================================================ */
+/* ============================================================
+   載入大畫布貼紙
+   ============================================================ */
+window.loadGallery = function () {
+  if (!state.selectedEvent) return;
+  const grid = document.getElementById('galleryGrid');
+  grid.innerHTML = '<div class="loading">載入中</div>';
+
+  onValue(ref(state.db, 'entries/' + state.selectedEvent), snap => {
+    const entries = snap.val() || {};
+    const arr = Object.values(entries); 
+    document.getElementById('galleryCount').textContent = arr.length ? `（${arr.length} 則）` : '';
+
+    if (!arr.length) {
+      grid.innerHTML = '<div class="empty-state" style="position:absolute;top:45%;width:100%">還沒有人留言，來當第一個貼上畫作的吧！✏️</div>';
+      return;
+    }
+    
+    grid.innerHTML = arr.map((e, i) => {
+      // 隨機產生 X (0~75%) 與 Y (0~75%) 的位置，避免超出邊界
+      const left = Math.random() * 75; 
+      const top = Math.random() * 75;  
+      // 隨機旋轉角度 -20度 到 +20度
+      const rot = (Math.random() - 0.5) * 40; 
+      // 越晚畫的 z-index 越高 (預設在越上層)
+      const zIndex = i; 
+
+      return `
+        <div class="board-item" style="left: ${left}%; top: ${top}%; transform: rotate(${rot}deg); z-index: ${zIndex};">
+          <img src="${e.image}" alt="留言畫作" loading="lazy">
+          <div class="board-tag">
+            ${e.author}
+            <div class="board-mood">${e.mood ? e.mood + '<br>' : ''}<span style="font-size:10px;color:#aaa">${e.time}</span></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }, { onlyOnce: true });
+};
+
+/* ============================================================
+   畫板初始化與操作
+   ============================================================ */
+const canvas = document.getElementById('drawCanvas');
+
+function initCanvas() {
+  resizeCanvas();
+  canvas.addEventListener('pointerdown', onDown);
+  canvas.addEventListener('pointermove', onMove);
+  canvas.addEventListener('pointerup',   onUp);
+  canvas.addEventListener('pointerleave', onUp);
+  canvas.addEventListener('dblclick',    onDblClick); 
+  window.addEventListener('resize',      resizeCanvas);
+}
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  // 💡 加入 || 800 作為保底寬度，避免隱藏狀態下寬度變成 0 導致當機
+  const w   = canvas.clientWidth || (canvas.parentElement && canvas.parentElement.clientWidth) || 800;
+  const backup = canvas.toDataURL(); 
+
+  canvas.width  = w * dpr;
+  canvas.height = 320 * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (backup !== 'data:,') {
+    const img = new Image();
+    img.onload = () => ctx.drawImage(img, 0, 0, w, 320);
+    img.src = backup;
+  }
+  saveSnapshot();
+}
+
+// 取得滑鼠/觸控在 canvas 上的位置
+function getCtx() { return canvas.getContext('2d'); }
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function applyStyle(ctx) {
+  ctx.globalAlpha  = state.opacity;
+  ctx.strokeStyle  = state.color;
+  ctx.fillStyle    = state.color;
+  ctx.lineWidth    = state.size;
+  ctx.lineCap      = 'round';
+  ctx.lineJoin     = 'round';
+}
+
+function saveSnapshot() {
+  // 🛡️ 安全鎖：如果寬高還是 0 就直接跳出，不要硬畫
+  if (canvas.width === 0 || canvas.height === 0) return; 
+  const tmp = document.createElement('canvas');
+  tmp.width = canvas.width; tmp.height = canvas.height;
+  tmp.getContext('2d').drawImage(canvas, 0, 0);
+  state.snapshot = tmp;
+}
+
+function pushHistory() {
+  const tmp = document.createElement('canvas');
+  tmp.width = canvas.width; tmp.height = canvas.height;
+  tmp.getContext('2d').drawImage(canvas, 0, 0);
+  state.history.push(tmp);
+  if (state.history.length > 30) state.history.shift(); 
+}
+
+window.undo = function () {
+  if (!state.history.length) return;
+  const ctx  = getCtx();
+  const prev = state.history.pop();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(prev, 0, 0);
+  saveSnapshot();
+};
+
+window.clearCanvas = function () {
+  pushHistory();
+  const ctx = getCtx();
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  saveSnapshot();
+};
+
+window.saveLocal = function () {
+  const a = document.createElement('a');
+  a.href     = canvas.toDataURL('image/png');
+  a.download = '心情畫作.png';  
+  a.click();
+};
+
+function onDown(e) {
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId); 
+  const { x, y } = getPos(e);
+  state.drawing = true;
+  state.startX = x; state.startY = y;
+  state.lastX  = x; state.lastY  = y;
+  pushHistory();
+  saveSnapshot();
+
+  const ctx = getCtx();
+  applyStyle(ctx);
+
+  if (state.tool === 'fill') {
+    floodFill(Math.round(x), Math.round(y));
+    state.drawing = false;
+    return;
+  }
+  if (state.tool === 'text') {
+    state.drawing = false; 
+    return;
+  }
+  if (state.tool === 'pen' || state.tool === 'eraser') {
+    ctx.beginPath();
+    ctx.arc(x, y, state.size / 2, 0, Math.PI * 2);
+    if (state.tool === 'eraser') { ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; }
+    ctx.fill();
+  }
+  if (state.tool === 'star') {
+    drawStar(ctx, x, y, state.size * 2);
+    state.drawing = false;
+    saveSnapshot();
+  }
+}
+
+function onMove(e) {
+  if (!state.drawing) return;
+  e.preventDefault();
+  const { x, y } = getPos(e);
+  const ctx = getCtx();
+  applyStyle(ctx);
+
+  if (state.tool === 'pen' || state.tool === 'eraser') {
+    ctx.beginPath();
+    ctx.moveTo(state.lastX, state.lastY);
+    ctx.lineTo(x, y);
+    if (state.tool === 'eraser') { ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; }
+    ctx.stroke();
+    state.lastX = x; state.lastY = y;
+  } else {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(state.snapshot, 0, 0);
+    applyStyle(ctx);
+    drawShape(ctx, state.startX, state.startY, x, y);
+  }
+}
+
+function onUp(e) {
+  if (!state.drawing) return;
+  state.drawing = false;
+  const { x, y } = getPos(e);
+  const ctx = getCtx();
+  applyStyle(ctx);
+
+  if (!['pen', 'eraser', 'fill', 'text', 'star'].includes(state.tool)) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(state.snapshot, 0, 0);
+    applyStyle(ctx);
+    drawShape(ctx, state.startX, state.startY, x, y);
+  }
+  saveSnapshot();
+}
+
+function onDblClick(e) {
+  if (state.tool !== 'text') return;
+  const { x, y } = getPos(e);
+  const text = prompt('輸入文字：');
+  if (!text) return;
+  pushHistory();
+  const ctx = getCtx();
+  applyStyle(ctx);
+  ctx.font = `${state.size * 3}px -apple-system, 'PingFang TC', sans-serif`;
+  ctx.fillText(text, x, y);
+  saveSnapshot();
+}
+
+function drawShape(ctx, x1, y1, x2, y2) {
+  ctx.beginPath();
+  if (state.tool === 'line') {
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  } else if (state.tool === 'rect') {
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+  } else if (state.tool === 'circle') {
+    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    const rx = Math.abs(x2 - x1) / 2, ry = Math.abs(y2 - y1) / 2;
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawStar(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+    const b = a + (2 * Math.PI) / 5;
+    ctx.lineTo(cx + r * Math.cos(a),       cy + r * Math.sin(a));
+    ctx.lineTo(cx + r * 0.4 * Math.cos(b), cy + r * 0.4 * Math.sin(b));
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+function floodFill(sx, sy) {
+  const ctx = getCtx();
+  const dpr = window.devicePixelRatio || 1;
+  const px = Math.round(sx * dpr), py = Math.round(sy * dpr);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imgData.data;
+  const w = canvas.width;
+  const i0 = (py * w + px) * 4;
+  const target = [d[i0], d[i0+1], d[i0+2], d[i0+3]];
+  const fill   = hexToRgb(state.color);
+  if (!fill) return;
+  if (target[0] === fill[0] && target[1] === fill[1] && target[2] === fill[2]) return;
+
+  const stack   = [[px, py]];
+  const visited = new Uint8Array(canvas.width * canvas.height);
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    if (cx < 0 || cx >= w || cy < 0 || cy >= canvas.height) continue;
+    if (visited[cy * w + cx]) continue;
+    const idx = (cy * w + cx) * 4;
+    if (d[idx] !== target[0] || d[idx+1] !== target[1] || d[idx+2] !== target[2]) continue;
+    visited[cy * w + cx] = 1;
+    d[idx] = fill[0]; d[idx+1] = fill[1]; d[idx+2] = fill[2]; d[idx+3] = 255;
+    stack.push([cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]);
+  }
+  ctx.putImageData(imgData, 0, 0);
+  saveSnapshot();
+}
+
+function hexToRgb(hex) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : null;
+}
+
+window.setTool = function (tool) {
+  state.tool = tool;
+  document.querySelectorAll('.tool-btn[id^=tb-]').forEach(b => b.classList.remove('active'));
+  document.getElementById('tb-' + tool)?.classList.add('active');
+};
+
+function buildSwatches() {
+  const row = document.getElementById('swatches');
+  row.innerHTML = COLORS.map(c => `
+    <div class="swatch ${c === state.color ? 'active' : ''}" data-c="${c}"
+      style="background:${c};${c === '#ffffff' ? 'border:2px solid #ccc' : ''}"
+      onclick="pickColor('${c}')"></div>
+  `).join('');
+}
+
+window.pickColor = function (c) {
+  state.color = c;
+  document.querySelectorAll('.swatch').forEach(s =>
+    s.classList.toggle('active', s.dataset.c === c)
+  );
+  if (state.tool === 'eraser') setTool('pen');
+};
+
+window.onSizeChange = function (v) {
+  state.size = +v;
+  document.getElementById('sizeLabel').textContent = v;
+};
+
+window.onOpacityChange = function (v) {
+  state.opacity = v / 100;
+  document.getElementById('opacityLabel').textContent = v + '%';
+};
+
+window.showToast = function (msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+};
+
+try {
+  const app = initializeApp(firebaseConfig);
+  state.db = getDatabase(app);
+  init();
+} catch (e) {
+  alert('Firebase 初始化失敗，請檢查設定是否正確！\n' + e.message);
+}
+
+</script>
+</body>
+</html>
