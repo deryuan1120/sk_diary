@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>心情小畫板</title>
+<title>師科日記</title>
 
 <style>
 /* ==== 全域 Reset ==== */
@@ -234,6 +234,19 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
   touch-action: pinch-zoom; 
 }
 /* ============================================================
+   橡皮擦游標 (圓圈圈)
+   ============================================================ */
+#eraserCursor {
+  position: fixed;
+  border: 1.5px solid #1a1a2e;
+  background: rgba(0, 0, 0, 0.05); /* 淡淡的灰色，讓使用者看清楚範圍 */
+  border-radius: 50%;
+  pointer-events: none; /* 🌟 絕對不能擋到滑鼠或筆尖的點擊 */
+  display: none;
+  transform: translate(-50%, -50%); /* 讓圓圈正中心對準筆尖 */
+  z-index: 9999;
+}
+/* ============================================================
    留言輸入區
    ============================================================ */
 .mood-section {
@@ -405,8 +418,8 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
           <button class="tool-btn"        id="tb-line"   onclick="setTool('line')"   title="直線">╱</button>
           <button class="tool-btn"        id="tb-rect"   onclick="setTool('rect')"   title="矩形">▭</button>
           <button class="tool-btn"        id="tb-circle" onclick="setTool('circle')" title="圓形">○</button>
-          <button class="tool-btn"        id="tb-fill"   onclick="setTool('fill')"   title="填色">🪣</button>
-          <button class="tool-btn"        id="tb-eraser" onclick="setTool('eraser')" title="橡皮擦"></button>
+          <button class="tool-btn"        id="tb-fill"   onclick="setTool('fill')"   title="色統">🪣</button>
+          <button class="tool-btn"        id="tb-eraser" onclick="setTool('eraser')" title="橡皮擦">🐘👞🧻</button>
         </div>
         <div class="sep"></div>
 
@@ -427,6 +440,7 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
       </div>
 
       <canvas id="drawCanvas" height="320"></canvas>
+      <div id="eraserCursor"></div>
 
       <div class="canvas-actions">
         <button class="btn sm" onclick="undo()">↩ 復原</button>
@@ -703,9 +717,6 @@ window.submitEntry = function () {
 };
 
 /* ============================================================
-   載入畫廊
-   ============================================================ */
-/* ============================================================
    載入大畫布貼紙
    ============================================================ */
 window.loadGallery = function () {
@@ -751,16 +762,44 @@ window.loadGallery = function () {
 /* ============================================================
    畫板初始化與操作 (支援 iPad 兩指縮放版)
    ============================================================ */
+/* ============================================================
+   畫板初始化與操作 (支援 Apple Pencil + 橡皮擦游標)
+   ============================================================ */
 const canvas = document.getElementById('drawCanvas');
 
 function initCanvas() {
   resizeCanvas();
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
+  
+  // 🌟 新增：隨時追蹤筆尖/滑鼠位置，用來顯示橡皮擦圓圈
+  canvas.addEventListener('pointermove', trackCursor);
+  
   canvas.addEventListener('pointerup',   onUp);
-  canvas.addEventListener('pointerleave', onUp);
-  canvas.addEventListener('pointercancel', onUp); // 🌟 兩指縮放觸發時，中斷畫畫動作
+  
+  // 🌟 修改：筆尖離開畫布時，順便把橡皮擦圓圈隱藏起來
+  canvas.addEventListener('pointerleave', (e) => {
+    document.getElementById('eraserCursor').style.display = 'none';
+    onUp(e);
+  });
+  
+  canvas.addEventListener('pointercancel', onUp);
   window.addEventListener('resize',      resizeCanvas);
+}
+
+// 🌟 新增：追蹤並更新橡皮擦圓圈的位置與大小
+function trackCursor(e) {
+  const cursor = document.getElementById('eraserCursor');
+  if (state.tool === 'eraser') {
+    cursor.style.display = 'block';
+    cursor.style.width = state.size + 'px';
+    cursor.style.height = state.size + 'px';
+    // e.clientX/Y 剛好配合 CSS 的 position: fixed
+    cursor.style.left = e.clientX + 'px';
+    cursor.style.top = e.clientY + 'px';
+  } else {
+    cursor.style.display = 'none';
+  }
 }
 
 function resizeCanvas() {
@@ -839,7 +878,10 @@ window.saveLocal = function () {
 
 /* --- 繪圖事件 --- */
 function onDown(e) {
-  if (!e.isPrimary) return; // 🌟 如果是第二根手指(兩指縮放)，就不要畫畫
+  // 🌟 關鍵升級：允許第一根手指，或是「任何觸控筆」！
+  // 這樣就算手掌先碰到螢幕防誤觸，筆尖依然可以順利畫畫
+  if (!e.isPrimary && e.pointerType !== 'pen') return; 
+  
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId); 
   const { x, y } = getPos(e);
@@ -861,7 +903,6 @@ function onDown(e) {
   if (state.tool === 'pen' || state.tool === 'eraser') {
     ctx.beginPath();
     ctx.arc(x, y, state.size / 2, 0, Math.PI * 2);
-    // 橡皮擦功能：其實就是畫透明色的線來覆蓋
     if (state.tool === 'eraser') { 
       ctx.globalCompositeOperation = "destination-out"; 
     } else {
@@ -872,7 +913,9 @@ function onDown(e) {
 }
 
 function onMove(e) {
-  if (!state.drawing || !e.isPrimary) return; // 🌟 忽略第二根手指
+  if (!state.drawing) return;
+  if (!e.isPrimary && e.pointerType !== 'pen') return; // 🌟 阻擋非觸控筆的第二指
+
   e.preventDefault();
   const { x, y } = getPos(e);
   const ctx = getCtx();
@@ -899,7 +942,9 @@ function onMove(e) {
 }
 
 function onUp(e) {
-  if (!state.drawing || !e.isPrimary) return;
+  if (!state.drawing) return;
+  if (!e.isPrimary && e.pointerType !== 'pen') return;
+
   state.drawing = false;
   const { x, y } = getPos(e);
   const ctx = getCtx();
