@@ -30,6 +30,7 @@ body {
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  touch-action: manipulation; 
 }
 
 /* ============================================================
@@ -229,11 +230,9 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
 #drawCanvas {
   display: block; width: 100%;
   border-radius: 8px; border: 1px solid var(--border);
-  background: #fff; cursor: crosshair;
-  touch-action: none; 
+  background: transparent; cursor: crosshair;
+  touch-action: pinch-zoom; 
 }
-.canvas-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-
 /* ============================================================
    留言輸入區
    ============================================================ */
@@ -407,9 +406,7 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
           <button class="tool-btn"        id="tb-rect"   onclick="setTool('rect')"   title="矩形">▭</button>
           <button class="tool-btn"        id="tb-circle" onclick="setTool('circle')" title="圓形">○</button>
           <button class="tool-btn"        id="tb-fill"   onclick="setTool('fill')"   title="填色">🪣</button>
-          <button class="tool-btn"        id="tb-text"   onclick="setTool('text')"   title="文字（雙擊畫板輸入）">T</button>
-          <button class="tool-btn"        id="tb-star"   onclick="setTool('star')"   title="星星">★</button>
-          <button class="tool-btn"        id="tb-eraser" onclick="setTool('eraser')" title="橡皮擦">🧹</button>
+          <button class="tool-btn"        id="tb-eraser" onclick="setTool('eraser')" title="橡皮擦"></button>
         </div>
         <div class="sep"></div>
 
@@ -751,6 +748,9 @@ window.loadGallery = function () {
 /* ============================================================
    畫板初始化與操作
    ============================================================ */
+/* ============================================================
+   畫板初始化與操作 (支援 iPad 兩指縮放版)
+   ============================================================ */
 const canvas = document.getElementById('drawCanvas');
 
 function initCanvas() {
@@ -759,13 +759,12 @@ function initCanvas() {
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup',   onUp);
   canvas.addEventListener('pointerleave', onUp);
-  canvas.addEventListener('dblclick',    onDblClick); 
+  canvas.addEventListener('pointercancel', onUp); // 🌟 兩指縮放觸發時，中斷畫畫動作
   window.addEventListener('resize',      resizeCanvas);
 }
 
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  // 💡 加入 || 800 作為保底寬度，避免隱藏狀態下寬度變成 0 導致當機
   const w   = canvas.clientWidth || (canvas.parentElement && canvas.parentElement.clientWidth) || 800;
   const backup = canvas.toDataURL(); 
 
@@ -783,7 +782,6 @@ function resizeCanvas() {
   saveSnapshot();
 }
 
-// 取得滑鼠/觸控在 canvas 上的位置
 function getCtx() { return canvas.getContext('2d'); }
 
 function getPos(e) {
@@ -801,7 +799,6 @@ function applyStyle(ctx) {
 }
 
 function saveSnapshot() {
-  // 🛡️ 安全鎖：如果寬高還是 0 就直接跳出，不要硬畫
   if (canvas.width === 0 || canvas.height === 0) return; 
   const tmp = document.createElement('canvas');
   tmp.width = canvas.width; tmp.height = canvas.height;
@@ -829,7 +826,6 @@ window.undo = function () {
 window.clearCanvas = function () {
   pushHistory();
   const ctx = getCtx();
-  ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   saveSnapshot();
 };
@@ -841,7 +837,9 @@ window.saveLocal = function () {
   a.click();
 };
 
+/* --- 繪圖事件 --- */
 function onDown(e) {
+  if (!e.isPrimary) return; // 🌟 如果是第二根手指(兩指縮放)，就不要畫畫
   e.preventDefault();
   canvas.setPointerCapture(e.pointerId); 
   const { x, y } = getPos(e);
@@ -859,25 +857,22 @@ function onDown(e) {
     state.drawing = false;
     return;
   }
-  if (state.tool === 'text') {
-    state.drawing = false; 
-    return;
-  }
+  
   if (state.tool === 'pen' || state.tool === 'eraser') {
     ctx.beginPath();
     ctx.arc(x, y, state.size / 2, 0, Math.PI * 2);
-    if (state.tool === 'eraser') { ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; }
+    // 橡皮擦功能：其實就是畫透明色的線來覆蓋
+    if (state.tool === 'eraser') { 
+      ctx.globalCompositeOperation = "destination-out"; 
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+    }
     ctx.fill();
-  }
-  if (state.tool === 'star') {
-    drawStar(ctx, x, y, state.size * 2);
-    state.drawing = false;
-    saveSnapshot();
   }
 }
 
 function onMove(e) {
-  if (!state.drawing) return;
+  if (!state.drawing || !e.isPrimary) return; // 🌟 忽略第二根手指
   e.preventDefault();
   const { x, y } = getPos(e);
   const ctx = getCtx();
@@ -887,10 +882,15 @@ function onMove(e) {
     ctx.beginPath();
     ctx.moveTo(state.lastX, state.lastY);
     ctx.lineTo(x, y);
-    if (state.tool === 'eraser') { ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; }
+    if (state.tool === 'eraser') { 
+      ctx.globalCompositeOperation = "destination-out"; 
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+    }
     ctx.stroke();
     state.lastX = x; state.lastY = y;
   } else {
+    ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(state.snapshot, 0, 0);
     applyStyle(ctx);
@@ -899,31 +899,19 @@ function onMove(e) {
 }
 
 function onUp(e) {
-  if (!state.drawing) return;
+  if (!state.drawing || !e.isPrimary) return;
   state.drawing = false;
   const { x, y } = getPos(e);
   const ctx = getCtx();
   applyStyle(ctx);
+  ctx.globalCompositeOperation = "source-over";
 
-  if (!['pen', 'eraser', 'fill', 'text', 'star'].includes(state.tool)) {
+  if (!['pen', 'eraser', 'fill'].includes(state.tool)) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(state.snapshot, 0, 0);
     applyStyle(ctx);
     drawShape(ctx, state.startX, state.startY, x, y);
   }
-  saveSnapshot();
-}
-
-function onDblClick(e) {
-  if (state.tool !== 'text') return;
-  const { x, y } = getPos(e);
-  const text = prompt('輸入文字：');
-  if (!text) return;
-  pushHistory();
-  const ctx = getCtx();
-  applyStyle(ctx);
-  ctx.font = `${state.size * 3}px -apple-system, 'PingFang TC', sans-serif`;
-  ctx.fillText(text, x, y);
   saveSnapshot();
 }
 
@@ -941,18 +929,6 @@ function drawShape(ctx, x1, y1, x2, y2) {
     ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
-}
-
-function drawStar(ctx, cx, cy, r) {
-  ctx.beginPath();
-  for (let i = 0; i < 5; i++) {
-    const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-    const b = a + (2 * Math.PI) / 5;
-    ctx.lineTo(cx + r * Math.cos(a),       cy + r * Math.sin(a));
-    ctx.lineTo(cx + r * 0.4 * Math.cos(b), cy + r * 0.4 * Math.sin(b));
-  }
-  ctx.closePath();
-  ctx.fill();
 }
 
 function floodFill(sx, sy) {
