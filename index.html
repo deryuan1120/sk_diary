@@ -798,12 +798,6 @@ window.loadGallery = function () {
 };
 
 /* ============================================================
-   畫板初始化與操作
-   ============================================================ */
-/* ============================================================
-   畫板初始化與操作 (支援 iPad 兩指縮放版)
-   ============================================================ */
-/* ============================================================
    畫板初始化與操作 (支援 Apple Pencil + 橡皮擦游標)
    ============================================================ */
 const canvas = document.getElementById('drawCanvas');
@@ -866,7 +860,14 @@ function getCtx() { return canvas.getContext('2d'); }
 
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  const dpr = window.devicePixelRatio || 1;
+  const scaleX = canvas.width / rect.width / dpr;
+  const scaleY = canvas.height / rect.height / dpr;
+  
+  return { 
+    x: (e.clientX - rect.left) * scaleX, 
+    y: (e.clientY - rect.top) * scaleY 
+  };
 }
 
 function applyStyle(ctx) {
@@ -1091,6 +1092,21 @@ window.showToast = function (msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 };
 
+/* ============================================================
+   深色模式切換邏輯
+   ============================================================ */
+window.toggleDarkMode = function() {
+  document.body.classList.toggle('dark-mode');
+  const isDark = document.body.classList.contains('dark-mode');
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  document.getElementById('darkModeBtn').textContent = isDark ? '☀️' : '🌙';
+};
+
+// 網頁載入時自動讀取之前的設定
+if (localStorage.getItem('theme') === 'dark') {
+  document.body.classList.add('dark-mode');
+  document.getElementById('darkModeBtn').textContent = '☀️';
+}
 try {
   const app = initializeApp(firebaseConfig);
   state.db = getDatabase(app);
