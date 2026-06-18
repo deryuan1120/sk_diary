@@ -24,13 +24,52 @@
   --shadow: 0 2px 12px rgba(124,111,247,0.10); /* 卡片陰影 */
 }
 
+body.dark-mode {
+  --bg: #121212;
+  --card: #1e1e2e;
+  --border: rgba(255,255,255,0.1);
+  --text: #e0e0e0;
+  --text-sub: #a0a0b8;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+/* ==== Body ==== */
 /* ==== Body ==== */
 body {
   font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  touch-action: manipulation; 
+  touch-action: manipulation;
+  
+  /* 🌟 徹底阻擋長按選取與放大鏡 */
+  -webkit-touch-callout: none; /* 禁用長按跳出的選單 */
+  -webkit-user-select: none;   /* 禁用 Safari 文字反白 */
+  user-select: none;           /* 禁用一般文字反白 */
+  transition: background 0.3s, color 0.3s; /* 深色模式切換動畫 */
+}
+
+input, select, textarea {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+#drawCanvas {
+  background: #fff;
+  /* 其餘保持不變 */
+  display: block; width: 100%;
+  border-radius: 8px; border: 1px solid var(--border);
+  cursor: crosshair;
+  touch-action: pinch-zoom; 
+}
+
+.board-item img {
+  width: 100%;
+  display: block;
+  background: #fff; /* 貼紙白底 */
+  border-radius: 4px;
+  padding: 4px; /* 拍立得邊框感 */
+  filter: drop-shadow(0 6px 12px rgba(0,0,0,0.15));
 }
 
 /* ============================================================
@@ -391,8 +430,10 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
 <body>
 
 <header>
-  <div class="logo">🎨 心情小畫板 <span id="headerEventLabel"></span></div>
+  <div class="logo">師科日記 <span id="headerEventLabel"></span></div>
   <div class="tab-pills">
+    <button class="tab-pill" id="darkModeBtn" onclick="toggleDarkMode()" style="font-size: 16px;">🌙</button>
+    
     <button class="tab-pill active" onclick="switchTab('client', this)">畫畫留言</button>
     <button class="tab-pill"        onclick="switchTab('admin',  this)">管理活動 🔒</button>
   </div>
