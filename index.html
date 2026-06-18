@@ -880,9 +880,11 @@ function trackCursor(e) {
   const cursor = document.getElementById('eraserCursor');
   if (state.tool === 'eraser') {
     cursor.style.display = 'block';
-    cursor.style.width = state.size + 'px';
-    cursor.style.height = state.size + 'px';
-    // e.clientX/Y 剛好配合 CSS 的 position: fixed
+    
+    const currentSize = state.size * cam.scale;
+    cursor.style.width = currentSize + 'px';
+    cursor.style.height = currentSize + 'px';
+    
     cursor.style.left = e.clientX + 'px';
     cursor.style.top = e.clientY + 'px';
   } else {
