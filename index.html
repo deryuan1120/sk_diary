@@ -55,12 +55,11 @@ input, select, textarea {
 }
 
 #drawCanvas {
-  background: #fff;
-  /* 其餘保持不變 */
   display: block; width: 100%;
-  border-radius: 8px; border: 1px solid var(--border);
   cursor: crosshair;
-  touch-action: pinch-zoom; 
+  touch-action: none; 
+  transform-origin: 0 0; 
+  will-change: transform; 
 }
 
 .board-item img {
@@ -480,7 +479,7 @@ main { max-width: 900px; margin: 0 auto; padding: 1rem; }
         </div>
       </div>
 
-      <canvas id="drawCanvas" height="320"></canvas>
+      <canvas id="drawCanvas" height="320" style="border: none; border-radius: 0;"></canvas>
       <div id="eraserCursor"></div>
 
       <div class="canvas-actions">
@@ -812,17 +811,71 @@ function initCanvas() {
   
   canvas.addEventListener('pointerup',   onUp);
   
-  // 🌟 修改：筆尖離開畫布時，順便把橡皮擦圓圈隱藏起來
   canvas.addEventListener('pointerleave', (e) => {
     document.getElementById('eraserCursor').style.display = 'none';
     onUp(e);
   });
-  
+  canvas.addEventListener('touchstart', handleGestures, { passive: false });
+  canvas.addEventListener('touchmove', handleGestures, { passive: false });
   canvas.addEventListener('pointercancel', onUp);
   window.addEventListener('resize',      resizeCanvas);
 }
 
-// 🌟 新增：追蹤並更新橡皮擦圓圈的位置與大小
+/* ============================================================
+   畫布兩指縮放與拖移引擎 (Custom Pan & Zoom)
+   ============================================================ */
+let cam = { x: 0, y: 0, scale: 1 };
+let startDist = 0;
+let startCam = { x: 0, y: 0, scale: 1 };
+let startCenter = { x: 0, y: 0 };
+let activeTouches = 0;
+
+function handleGestures(e) {
+  if (e.touches.length === 1) {
+    e.preventDefault(); // 單指畫畫，防誤觸
+  } 
+  else if (e.touches.length === 2) {
+    e.preventDefault(); // 阻擋網頁的原生縮放
+    state.drawing = false; // 🌟 只要兩指放上去，立刻中斷畫筆，防止畫出亂線
+
+    const t1 = e.touches[0], t2 = e.touches[1];
+    // 計算兩指距離
+    const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    // 計算兩指中心點
+    const center = { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+
+    if (activeTouches !== 2) {
+      // 剛放上第二根手指：記錄當下的快照
+      startDist = dist;
+      startCam = { ...cam };
+      startCenter = center;
+    } else {
+      // 兩根手指移動中：計算放大倍率與平移
+      const scaleRatio = dist / startDist;
+      let newScale = Math.max(1, Math.min(startCam.scale * scaleRatio, 5)); // 限制放大 1倍~5倍
+
+      const deltaX = center.x - startCenter.x;
+      const deltaY = center.y - startCenter.y;
+
+      //確保縮放的焦點對準使用者的兩指中心
+      cam.scale = newScale;
+      cam.x = startCam.x + (startCenter.x - startCam.x) * (1 - newScale / startCam.scale) + deltaX;
+      cam.y = startCam.y + (startCenter.y - startCam.y) * (1 - newScale / startCam.scale) + deltaY;
+
+      // 如果縮回 1 倍，畫面自動歸位對齊
+      if (cam.scale <= 1.05) { cam.scale = 1; cam.x = 0; cam.y = 0; }
+
+      // 套用 CSS 變形
+      canvas.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.scale})`;
+    }
+  }
+  activeTouches = e.touches.length;
+}
+
+// 當手指離開螢幕時重置觸控狀態
+canvas.addEventListener('touchend', () => { activeTouches = 0; });
+canvas.addEventListener('touchcancel', () => { activeTouches = 0; });
+
 function trackCursor(e) {
   const cursor = document.getElementById('eraserCursor');
   if (state.tool === 'eraser') {
